@@ -1,5 +1,9 @@
 ﻿.venv/
-static/uploads/
+# Ignore everything inside uploads...
+static/uploads/*
+
+# ...but DO track the placeholder so the folder exists in the repo
+!static/uploads/.gitkeep
 __pycache__/
 *.pyc
 *.db
