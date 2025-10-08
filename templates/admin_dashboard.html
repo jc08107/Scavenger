@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Admin&nbsp;Dashboard</h2>
+<p>Current&nbsp;Game&nbsp;State:&nbsp;<strong>{{ game_state|capitalize }}</strong></p>
+<form method="post" action="/admin/state" class="form-inline">
+    <label for="new_state">Change&nbsp;State:</label>
+    <select name="new_state" id="new_state">
+        <option value="draft" {% if game_state == 'draft' %}selected{% endif %}>Draft</option>
+        <option value="live" {% if game_state == 'live' %}selected{% endif %}>Live</option>
+        <option value="closed" {% if game_state == 'closed' %}selected{% endif %}>Closed</option>
+    </select>
+    <button type="submit">Update</button>
+</form>
+<p><a href="/admin/upload-quests">Upload&nbsp;Quest&nbsp;CSV</a></p>
+{% endblock %}

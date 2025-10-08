@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Judge&nbsp;Dashboard&nbsp;–&nbsp;Teams</h2>
+{% if teams %}
+<ul class="team-list">
+    {% for team in teams %}
+    <li><a href="/judge/ballot/{{ team.id }}">{{ team.name }}</a></li>
+    {% endfor %}
+</ul>
+{% else %}
+<p>No teams available to judge yet.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,168 @@
+/* Basic styling for the scavenger hunt app */
+
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+    line-height: 1.5;
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+header {
+    background-color: #003366;
+    color: white;
+    padding: 1rem;
+}
+
+.header-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+}
+
+nav a {
+    color: white;
+    margin-left: 1rem;
+    text-decoration: none;
+    font-weight: bold;
+}
+
+nav a:hover {
+    text-decoration: underline;
+}
+
+main {
+    padding: 1rem;
+    max-width: 960px;
+    margin: 0 auto;
+    background-color: white;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+h2 {
+    margin-top: 0;
+}
+
+form {
+    margin: 1rem 0;
+}
+
+.form-group {
+    margin-bottom: 0.75rem;
+}
+
+label {
+    display: block;
+    margin-bottom: 0.25rem;
+    font-weight: bold;
+}
+
+input[type="text"],
+input[type="email"],
+input[type="password"],
+input[type="number"],
+select {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+
+input[type="file"] {
+    padding: 0.5rem 0;
+}
+
+button {
+    background-color: #0066cc;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    padding: 0.5rem 1rem;
+    font-size: 1rem;
+    cursor: pointer;
+    min-width: 44px;
+    min-height: 44px;
+}
+
+button:hover {
+    background-color: #004a99;
+}
+
+.error {
+    color: #d8000c;
+    background-color: #ffbaba;
+    padding: 0.5rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+}
+
+th, td {
+    padding: 0.5rem;
+    border: 1px solid #ccc;
+    text-align: left;
+}
+
+th {
+    background-color: #f0f0f0;
+}
+
+tr.uploaded {
+    background-color: #e8f5e9;
+}
+
+.team-list {
+    list-style: none;
+    padding: 0;
+}
+
+.team-list li {
+    margin-bottom: 0.5rem;
+}
+
+.team-list a {
+    color: #0066cc;
+    text-decoration: none;
+}
+
+.team-list a:hover {
+    text-decoration: underline;
+}
+
+.role-option {
+    display: inline-block;
+    margin-right: 1rem;
+    font-weight: normal;
+}
+
+.form-inline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.upload-form {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+/* Ensure form controls and buttons meet WCAG minimum target size of 44x44 pixels */
+input[type="file"], input[type="number"], select, button {
+    min-width: 44px;
+    min-height: 44px;
+}

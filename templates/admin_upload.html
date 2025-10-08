@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Upload&nbsp;Quests</h2>
+<p>Upload a CSV file containing your quests. The CSV must have a header row with the columns: <code>quest_uid</code>, <code>description</code>, <code>media_required</code> (photo or video), and <code>points_label</code>.</p>
+<form method="post" action="/admin/upload-quests" enctype="multipart/form-data">
+    <input type="file" name="file" accept=".csv" required>
+    <button type="submit">Upload</button>
+</form>
+<p><a href="/admin/dashboard">Back&nbsp;to&nbsp;Dashboard</a></p>
+{% endblock %}

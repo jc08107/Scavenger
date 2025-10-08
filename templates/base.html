@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scavenger Hunt&nbsp;2025</title>
+    <!-- Link to a simple stylesheet for basic layout and accessibility -->
+    <link rel="stylesheet" href="{{ url_for('static', path='style.css') }}">
+</head>
+<body>
+    <header>
+        <div class="header-container">
+            <h1>Scavenger&nbsp;Hunt&nbsp;2025</h1>
+            <nav>
+                {% if request.session.get('user_id') %}
+                <a href="/">Home</a>
+                <a href="/logout">Logout</a>
+                {% else %}
+                <a href="/login">Login</a>
+                <a href="/signup">Sign&nbsp;Up</a>
+                {% endif %}
+            </nav>
+        </div>
+    </header>
+    <main>
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

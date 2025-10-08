@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Select&nbsp;Your&nbsp;Role</h2>
+<form method="post">
+    <fieldset>
+        <legend>Choose&nbsp;a&nbsp;role:</legend>
+        <label class="role-option">
+            <input type="radio" name="role" value="player" required>
+            Player
+        </label>
+        <label class="role-option">
+            <input type="radio" name="role" value="judge">
+            Judge
+        </label>
+        <label class="role-option">
+            <input type="radio" name="role" value="admin">
+            Admin
+        </label>
+    </fieldset>
+    <button type="submit">Continue</button>
+</form>
+{% endblock %}

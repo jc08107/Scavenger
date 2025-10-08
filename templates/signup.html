@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Sign&nbsp;Up</h2>
+{% if error %}
+<p class="error">{{ error }}</p>
+{% endif %}
+<form method="post" class="form" novalidate>
+    <div class="form-group">
+        <label for="first_name">First&nbsp;Name</label>
+        <input type="text" id="first_name" name="first_name" required>
+    </div>
+    <div class="form-group">
+        <label for="email">Email</label>
+        <input type="email" id="email" name="email" required>
+    </div>
+    <div class="form-group">
+        <label for="password">Password</label>
+        <input type="password" id="password" name="password" required>
+    </div>
+    <div class="form-group">
+        <label for="invitation_code">Invitation&nbsp;Code</label>
+        <input type="text" id="invitation_code" name="invitation_code" required>
+    </div>
+    <button type="submit">Create&nbsp;Account</button>
+</form>
+<p>Already have an account? <a href="/login">Log&nbsp;in</a></p>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Judging&nbsp;Team&nbsp;{{ team.name }}</h2>
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Description</th>
+            <th>Media&nbsp;Type</th>
+            <th>Points</th>
+            <th>Media</th>
+            <th>Score</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for q in quests %}
+        <tr class="{% if q.status == 'uploaded' and q.score is not none %}uploaded{% endif %}">
+            <td>{{ q.quest_uid }}</td>
+            <td>{{ q.description }}</td>
+            <td>{{ q.media_required }}</td>
+            <td>{{ q.points_label }}</td>
+            <td>
+                {% if q.status == 'uploaded' %}
+                <a href="{{ q.media_url }}" target="_blank" rel="noopener noreferrer">Open&nbsp;Media</a>
+                {% else %}
+                Pending
+                {% endif %}
+            </td>
+            <td>
+                <form method="post" action="/judge/score">
+                    <input type="hidden" name="team_quest_id" value="{{ q.team_quest_id }}">
+                    <input type="number" name="score" min="0" value="{{ q.score if q.score is not none else '' }}" required>
+                    <button type="submit">Save</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<p><a href="/judge/results/{{ team.id }}" class="button">Score</a></p>
+<p><a href="/judge/teams">Back&nbsp;to&nbsp;Team&nbsp;List</a></p>
+{% endblock %}

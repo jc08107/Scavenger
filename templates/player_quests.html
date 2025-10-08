@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Team&nbsp;{{ team_name }}&nbsp;–&nbsp;Quests</h2>
+{% if game_state != 'live' %}
+<p>The game has not started yet. Please check back once the administrator has launched the game.</p>
+{% else %}
+<table>
+    <thead>
+        <tr>
+            <th>ID</th>
+            <th>Description</th>
+            <th>Media&nbsp;Type</th>
+            <th>Points</th>
+            <th>Upload</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for q in quests %}
+        <tr class="{% if q.status == 'uploaded' %}uploaded{% endif %}">
+            <td>{{ q.quest_uid }}</td>
+            <td>{{ q.description }}</td>
+            <td>{{ q.media_required }}</td>
+            <td>{{ q.points_label }}</td>
+            <td>
+                {% if q.status == 'uploaded' %}
+                <a href="/static/{{ q.media_file }}" target="_blank" rel="noopener noreferrer">View</a>
+                {% endif %}
+                <form method="post" action="/player/upload/{{ q.team_quest_id }}" enctype="multipart/form-data" class="upload-form">
+                    <input type="file" name="upload_file" accept="{{ 'image/*' if q.media_required == 'photo' else 'video/*' }}" required>
+                    <button type="submit">{{ q.upload_btn_label }}</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+{% endblock %}
