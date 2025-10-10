@@ -4,6 +4,10 @@
 <h2>Select&nbsp;Your&nbsp;Team</h2>
 <p>You are not part of a team yet. Join an existing team or create a new one to begin playing.</p>
 
+{% if message %}
+<p class="alert error">{{ message }}</p>
+{% endif %}
+
 <h3>Join&nbsp;an&nbsp;Existing&nbsp;Team</h3>
 {% if teams %}
 <form method="post">

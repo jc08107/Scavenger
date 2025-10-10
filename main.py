@@ -18,6 +18,7 @@ import os
 import uuid
 from datetime import datetime
 from typing import List, Optional
+from urllib.parse import quote
 
 from fastapi import (
     Depends,
@@ -29,7 +30,7 @@ from fastapi import (
     UploadFile,
     status,
 )
-from fastapi.responses import HTMLResponse, RedirectResponse
+from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from sqlalchemy import text
@@ -460,11 +461,13 @@ def player_teams_get(request: Request, db: Session = Depends(database.get_db), u
         return RedirectResponse(url="/player/home", status_code=302)
     # Retrieve existing teams
     teams = db.query(Team).all()
+    message = request.query_params.get("message")
     return templates.TemplateResponse(
         "player_teams.html",
         {
             "request": request,
             "teams": teams,
+            "message": message,
         },
     )
 
@@ -476,10 +479,22 @@ def player_teams_post(
     new_team_name: Optional[str] = Form(None),
     db: Session = Depends(database.get_db),
     user: User = Depends(require_role("player")),
-) -> RedirectResponse:
+) -> Response:
     if user.team_id:
         return RedirectResponse(url="/player/home", status_code=302)
     session = get_session(db)
+
+    def render_with_message(message: str, status_code: int = 200) -> HTMLResponse:
+        teams = db.query(Team).all()
+        return templates.TemplateResponse(
+            "player_teams.html",
+            {
+                "request": request,
+                "teams": teams,
+                "message": message,
+            },
+            status_code=status_code,
+        )
 
     # Normalize inputs
     team_id = (team_id or "").strip()
@@ -489,11 +504,10 @@ def player_teams_post(
     if new_team_name:
         # Basic validation
         if len(new_team_name) < 3:
-            raise HTTPException(400, detail="Team name must be at least 3 characters")
+            return render_with_message("Team name must be at least 3 characters.")
         # Check unique name
         if db.query(Team).filter(Team.name == new_team_name).first():
-            # Name taken; you could re-render with a message; for now just 400:
-            raise HTTPException(400, detail="Team name already in use")
+            return render_with_message("That team name is already in use. Please choose another name.")
         team = Team(name=new_team_name, created_by_user_id=user.id)
         db.add(team)
         db.commit()
@@ -508,10 +522,13 @@ def player_teams_post(
         try:
             tid = int(team_id)
         except ValueError:
-            raise HTTPException(400, detail="Invalid team ID")
+            return render_with_message("Please select a valid team.")
         team = db.query(Team).filter(Team.id == tid).first()
         if not team:
-            raise HTTPException(404, detail="Team not found")
+            return render_with_message("That team could not be found. Please pick another team or create one.")
+        member_count = db.query(User).filter(User.team_id == team.id).count()
+        if member_count >= 9:
+            return render_with_message("That team already has 9 players. Please join a different team or create your own.")
         user.team_id = team.id
         user.is_team_leader = False
         db.commit()
@@ -519,7 +536,7 @@ def player_teams_post(
         return RedirectResponse(url="/player/home", status_code=302)
 
     # Neither a new name nor a valid team_id was provided
-    raise HTTPException(400, detail="Please choose a team or enter a new team name")
+    return render_with_message("Please choose a team or enter a new team name.", status_code=400)
 
 
 @app.get("/player/home", response_class=HTMLResponse)
@@ -851,6 +868,13 @@ def admin_dashboard(
         .order_by(Team.name.asc())
         .all()
     )
+    transfer_players = (
+        db.query(User)
+        .filter(User.role == "player", User.team_id.isnot(None))
+        .options(subqueryload(User.team))
+        .order_by(User.first_name.asc())
+        .all()
+    )
     team_groups = []
     for team in teams:
         members = sorted(team.members, key=lambda member: member.first_name.lower())
@@ -862,6 +886,15 @@ def admin_dashboard(
         .all()
     )
     quest_count = db.query(Quest).filter(Quest.session_id == session.id).count()
+    transfer_teams = []
+    for team in teams:
+        member_count = len(team.members)
+        if member_count < 9:
+            transfer_teams.append(
+                {"id": team.id, "name": team.name, "member_count": member_count}
+            )
+    transfer_message = request.query_params.get("transfer_message")
+    transfer_error = request.query_params.get("transfer_error")
     return templates.TemplateResponse(
         "admin_dashboard.html",
         {
@@ -870,6 +903,10 @@ def admin_dashboard(
             "team_groups": team_groups,
             "awaiting_members": awaiting_members,
             "quest_count": quest_count,
+            "transfer_players": transfer_players,
+            "transfer_teams": transfer_teams,
+            "transfer_message": transfer_message,
+            "transfer_error": transfer_error,
         },
     )
 
@@ -965,3 +1002,53 @@ def admin_team_reset(
     reset_all_teams(db)
     db.commit()
     return RedirectResponse(url="/admin/dashboard", status_code=302)
+
+
+@app.post("/admin/transfer-player")
+def admin_transfer_player(
+    request: Request,
+    player_id: int = Form(...),
+    target_team_id: int = Form(...),
+    db: Session = Depends(database.get_db),
+    user: User = Depends(require_role("admin")),
+) -> RedirectResponse:
+    def redirect_with_feedback(key: str, message: str) -> RedirectResponse:
+        encoded = quote(message)
+        return RedirectResponse(url=f"/admin/dashboard?{key}={encoded}", status_code=302)
+
+    player = (
+        db.query(User)
+        .filter(User.id == player_id, User.role == "player")
+        .options(subqueryload(User.team))
+        .first()
+    )
+    if not player:
+        return redirect_with_feedback("transfer_error", "Player not found.")
+    if player.team_id is None:
+        return redirect_with_feedback("transfer_error", "This player is not currently assigned to a team.")
+    try:
+        target_team_id_int = int(target_team_id)
+    except (TypeError, ValueError):
+        return redirect_with_feedback("transfer_error", "Please select a valid team to transfer to.")
+    target_team = db.query(Team).filter(Team.id == target_team_id_int).first()
+    if not target_team:
+        return redirect_with_feedback("transfer_error", "Selected team could not be found.")
+    if player.team_id == target_team.id:
+        return redirect_with_feedback("transfer_error", "Player is already on that team.")
+    member_count = db.query(User).filter(User.team_id == target_team.id).count()
+    if member_count >= 9:
+        return redirect_with_feedback("transfer_error", "Selected team already has the maximum of 9 players.")
+
+    player.team_id = target_team.id
+    player.is_team_leader = False
+    db.commit()
+
+    session = get_session(db)
+    ensure_team_quests(db, target_team, session)
+
+    player_name = player.first_name
+    new_team_name = target_team.name
+    return redirect_with_feedback(
+        "transfer_message",
+        f"{player_name} has been transferred to {new_team_name}.",
+    )

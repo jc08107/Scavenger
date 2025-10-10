@@ -27,6 +27,38 @@
 <form method="post" action="/admin/team-reset" class="form-inline" onsubmit="return confirm('This will delete all teams and remove members from their teams. Continue?');">
     <button type="submit">Team&nbsp;Reset</button>
 </form>
+<section class="transfer-section">
+    <h3>Transfer&nbsp;Team&nbsp;Member</h3>
+    {% if transfer_error %}
+    <p class="alert error">{{ transfer_error }}</p>
+    {% endif %}
+    {% if transfer_message %}
+    <p class="alert success">{{ transfer_message }}</p>
+    {% endif %}
+    {% if transfer_players and transfer_teams %}
+    <form method="post" action="/admin/transfer-player" class="form-inline transfer-form">
+        <label for="transfer_player_id">Player:</label>
+        <select name="player_id" id="transfer_player_id" required>
+            <option value="" disabled selected>Select&nbsp;Player</option>
+            {% for player in transfer_players %}
+            <option value="{{ player.id }}" data-current-team="{{ player.team_id or '' }}">{{ player.first_name }}{% if player.team %} &mdash; {{ player.team.name }}{% endif %}</option>
+            {% endfor %}
+        </select>
+        <span class="transfer-label">Transfer&nbsp;to</span>
+        <select name="target_team_id" id="transfer_team_id" required>
+            <option value="" disabled selected>Select&nbsp;Team</option>
+            {% for team in transfer_teams %}
+            <option value="{{ team.id }}" data-member-count="{{ team.member_count }}">{{ team.name }} ({{ team.member_count }} players)</option>
+            {% endfor %}
+        </select>
+        <button type="submit">Transfer</button>
+    </form>
+    {% elif not transfer_players %}
+    <p class="empty-state">No players are currently assigned to teams.</p>
+    {% else %}
+    <p class="empty-state">No teams have open slots under the 9-player limit.</p>
+    {% endif %}
+</section>
 
 <section class="roster-section">
     <h3>Teams&nbsp;&amp;&nbsp;Members</h3>
@@ -73,4 +105,36 @@
     <p class="empty-state">All members have selected a team.</p>
     {% endif %}
 </section>
+{% if transfer_players and transfer_teams %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const playerSelect = document.getElementById('transfer_player_id');
+    const teamSelect = document.getElementById('transfer_team_id');
+    function filterTeams() {
+        const currentTeamId = playerSelect.selectedOptions.length ? playerSelect.selectedOptions[0].dataset.currentTeam : '';
+        Array.from(teamSelect.options).forEach((option) => {
+            if (!option.value) {
+                option.hidden = false;
+                option.disabled = false;
+                return;
+            }
+            if (option.value === currentTeamId) {
+                option.hidden = true;
+                option.disabled = true;
+                if (teamSelect.value === option.value) {
+                    teamSelect.value = '';
+                }
+            } else {
+                option.hidden = false;
+                option.disabled = false;
+            }
+        });
+    }
+    if (playerSelect && teamSelect) {
+        playerSelect.addEventListener('change', filterTeams);
+        filterTeams();
+    }
+});
+</script>
+{% endif %}
 {% endblock %}
