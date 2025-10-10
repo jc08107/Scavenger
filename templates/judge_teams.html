@@ -22,13 +22,17 @@
         <li>0 (Must have been a butt dial): Not even remotely relevant.</li>
     </ul>
 </section>
-{% if teams %}
-<ul class="team-list">
-    {% for team in teams %}
-    <li><a href="/judge/ballot/{{ team.id }}">{{ team.name }}</a></li>
-    {% endfor %}
-</ul>
+{% if game_state == 'live' and quest_count > 0 %}
+    {% if teams %}
+    <ul class="team-list">
+        {% for team in teams %}
+        <li><a href="/judge/ballot/{{ team.id }}">{{ team.name }}</a></li>
+        {% endfor %}
+    </ul>
+    {% else %}
+    <p>No teams available to judge yet.</p>
+    {% endif %}
 {% else %}
-<p>No teams available to judge yet.</p>
+<p class="empty-state">Awaiting the next quest CSV upload. Ballots will appear once the game is live.</p>
 {% endif %}
 {% endblock %}

@@ -2,58 +2,62 @@
 
 {% block content %}
 <h2>Results&nbsp;for&nbsp;{{ team.name }}</h2>
-<table class="score-summary">
-    <tbody>
-        <tr>
-            <th scope="row">Your&nbsp;Total</th>
-            <td>{{ your_total }}</td>
-        </tr>
-        <tr>
-            <th scope="row">Average&nbsp;Total</th>
-            <td>
-                {% if average_total is not none %}
-                    {{ average_total }}
-                {% else %}
-                    &mdash;
-                {% endif %}
-            </td>
-        </tr>
-    </tbody>
-</table>
-{% if judge_count <= 1 %}
-<p class="score-note">Only one judge has scored this team so far. The average matches your totals.</p>
+{% if game_state == 'live' and quests %}
+    <table class="score-summary">
+        <tbody>
+            <tr>
+                <th scope="row">Your&nbsp;Total</th>
+                <td>{{ your_total }}</td>
+            </tr>
+            <tr>
+                <th scope="row">Average&nbsp;Total</th>
+                <td>
+                    {% if average_total is not none %}
+                        {{ average_total }}
+                    {% else %}
+                        &mdash;
+                    {% endif %}
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    {% if judge_count <= 1 %}
+    <p class="score-note">Only one judge has scored this team so far. The average matches your totals.</p>
+    {% endif %}
+    <table class="score-breakdown">
+        <thead>
+            <tr>
+                <th>Quest</th>
+                <th>Points</th>
+                <th>Your&nbsp;Score</th>
+                <th>Average&nbsp;Score</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for row in quests %}
+            <tr>
+                <td>{{ row.quest_uid }}</td>
+                <td>{{ row.points_label }}</td>
+                <td>
+                    {% if row.your_score is not none %}
+                        {{ row.your_score }}
+                    {% else %}
+                        &mdash;
+                    {% endif %}
+                </td>
+                <td>
+                    {% if row.average_score is not none %}
+                        {{ row.average_score }}
+                    {% else %}
+                        &mdash;
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+{% else %}
+<p class="empty-state">Awaiting the next quest CSV upload. Results will appear once the game is live.</p>
 {% endif %}
-<table class="score-breakdown">
-    <thead>
-        <tr>
-            <th>Quest</th>
-            <th>Points</th>
-            <th>Your&nbsp;Score</th>
-            <th>Average&nbsp;Score</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for row in quests %}
-        <tr>
-            <td>{{ row.quest_uid }}</td>
-            <td>{{ row.points_label }}</td>
-            <td>
-                {% if row.your_score is not none %}
-                    {{ row.your_score }}
-                {% else %}
-                    &mdash;
-                {% endif %}
-            </td>
-            <td>
-                {% if row.average_score is not none %}
-                    {{ row.average_score }}
-                {% else %}
-                    &mdash;
-                {% endif %}
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
 <p><a href="/judge/teams">Back&nbsp;to&nbsp;Team&nbsp;List</a></p>
 {% endblock %}

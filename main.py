@@ -202,6 +202,87 @@ def ensure_team_quests(db: Session, team: Team, session: GameSession) -> None:
     db.commit()
 
 
+def reset_session_quests(db: Session, session: GameSession) -> None:
+    """Purge all quest-related data for the current session.
+
+    This removes quests, team quest associations, uploaded media (including
+    files on disk), and judge scores.  The game session state is returned to
+    draft so players and judges are prompted to await the next upload.
+    """
+    # Gather quests for the session
+    quests = db.query(Quest).filter(Quest.session_id == session.id).all()
+    if not quests:
+        session.state = "draft"
+        session.launched_at = None
+        session.closed_at = None
+        return
+
+    quest_ids = [quest.id for quest in quests]
+    team_quests = db.query(TeamQuest).filter(TeamQuest.quest_id.in_(quest_ids)).all()
+    team_quest_ids = [tq.id for tq in team_quests]
+
+    if team_quest_ids:
+        media_uploads = (
+            db.query(MediaUpload)
+            .filter(MediaUpload.team_quest_id.in_(team_quest_ids))
+            .all()
+        )
+        for media in media_uploads:
+            abs_path = os.path.abspath(os.path.join(STATIC_DIR, media.file_path))
+            try:
+                if os.path.commonpath([STATIC_DIR, abs_path]) == STATIC_DIR and os.path.exists(abs_path):
+                    os.remove(abs_path)
+            except (OSError, ValueError):
+                # Ignore filesystem errors; database records will still be removed
+                pass
+        db.query(MediaUpload).filter(MediaUpload.team_quest_id.in_(team_quest_ids)).delete(synchronize_session=False)
+        db.query(Score).filter(Score.team_quest_id.in_(team_quest_ids)).delete(synchronize_session=False)
+        db.query(TeamQuest).filter(TeamQuest.id.in_(team_quest_ids)).delete(synchronize_session=False)
+
+    db.query(Quest).filter(Quest.id.in_(quest_ids)).delete(synchronize_session=False)
+
+    session.state = "draft"
+    session.launched_at = None
+    session.closed_at = None
+
+    return
+
+
+def reset_all_teams(db: Session) -> None:
+    """Remove all teams and clear member associations between games."""
+    teams = db.query(Team).all()
+    if not teams:
+        return
+    team_ids = [team.id for team in teams]
+    team_quests = db.query(TeamQuest).filter(TeamQuest.team_id.in_(team_ids)).all()
+    team_quest_ids = [tq.id for tq in team_quests]
+
+    if team_quest_ids:
+        media_uploads = (
+            db.query(MediaUpload)
+            .filter(MediaUpload.team_quest_id.in_(team_quest_ids))
+            .all()
+        )
+        for media in media_uploads:
+            abs_path = os.path.abspath(os.path.join(STATIC_DIR, media.file_path))
+            try:
+                if os.path.commonpath([STATIC_DIR, abs_path]) == STATIC_DIR and os.path.exists(abs_path):
+                    os.remove(abs_path)
+            except (OSError, ValueError):
+                pass
+        db.query(MediaUpload).filter(MediaUpload.team_quest_id.in_(team_quest_ids)).delete(synchronize_session=False)
+        db.query(Score).filter(Score.team_quest_id.in_(team_quest_ids)).delete(synchronize_session=False)
+        db.query(TeamQuest).filter(TeamQuest.id.in_(team_quest_ids)).delete(synchronize_session=False)
+
+    db.query(User).filter(User.team_id.isnot(None)).update(
+        {User.team_id: None, User.is_team_leader: False},
+        synchronize_session=False,
+    )
+    db.query(Team).filter(Team.id.in_(team_ids)).delete(synchronize_session=False)
+
+    return
+
+
 # ----------------------- Route Handlers -----------------------
 
 @app.get("/", response_class=HTMLResponse)
@@ -569,7 +650,16 @@ def judge_teams_get(request: Request, db: Session = Depends(database.get_db), us
     # List teams that have quests in the session
     session = get_session(db)
     teams = db.query(Team).all()
-    return templates.TemplateResponse("judge_teams.html", {"request": request, "teams": teams})
+    quest_count = db.query(Quest).filter(Quest.session_id == session.id).count()
+    return templates.TemplateResponse(
+        "judge_teams.html",
+        {
+            "request": request,
+            "teams": teams,
+            "game_state": session.state,
+            "quest_count": quest_count,
+        },
+    )
 
 
 @app.get("/judge/ballot/{team_id}", response_class=HTMLResponse)
@@ -629,6 +719,7 @@ def judge_ballot_get(
             "request": request,
             "team": team,
             "quests": quests_data,
+            "game_state": session.state,
         },
     )
 
@@ -742,6 +833,7 @@ def judge_team_results(
             "your_total": your_total,
             "average_total": average_total,
             "judge_count": judge_count,
+            "game_state": session.state,
         },
     )
 
@@ -769,6 +861,7 @@ def admin_dashboard(
         .order_by(User.first_name.asc())
         .all()
     )
+    quest_count = db.query(Quest).filter(Quest.session_id == session.id).count()
     return templates.TemplateResponse(
         "admin_dashboard.html",
         {
@@ -776,6 +869,7 @@ def admin_dashboard(
             "game_state": session.state,
             "team_groups": team_groups,
             "awaiting_members": awaiting_members,
+            "quest_count": quest_count,
         },
     )
 
@@ -843,5 +937,31 @@ def admin_upload_post(
                 points_label=points_label or "",
             )
             db.add(quest)
+    db.commit()
+    return RedirectResponse(url="/admin/dashboard", status_code=302)
+
+
+@app.post("/admin/quest-actions")
+def admin_quest_actions(
+    request: Request,
+    quest_action: str = Form(...),
+    db: Session = Depends(database.get_db),
+    user: User = Depends(require_role("admin")),
+) -> RedirectResponse:
+    session = get_session(db)
+    if quest_action != "delete":
+        raise HTTPException(400, detail="Unsupported quest action")
+    reset_session_quests(db, session)
+    db.commit()
+    return RedirectResponse(url="/admin/dashboard", status_code=302)
+
+
+@app.post("/admin/team-reset")
+def admin_team_reset(
+    request: Request,
+    db: Session = Depends(database.get_db),
+    user: User = Depends(require_role("admin")),
+) -> RedirectResponse:
+    reset_all_teams(db)
     db.commit()
     return RedirectResponse(url="/admin/dashboard", status_code=302)

@@ -13,6 +13,20 @@
     <button type="submit">Update</button>
 </form>
 <p><a href="/admin/upload-quests">Upload&nbsp;Quest&nbsp;CSV</a></p>
+<form method="post" action="/admin/quest-actions" class="form-inline">
+    <label for="quest_action">Quest&nbsp;CSV&nbsp;Actions:</label>
+    <select name="quest_action" id="quest_action" {% if quest_count == 0 %}disabled{% endif %} required>
+        <option value="" selected disabled>Select&nbsp;Action</option>
+        <option value="delete">Delete&nbsp;Current&nbsp;CSV&nbsp;and&nbsp;Scores</option>
+    </select>
+    <button type="submit" {% if quest_count == 0 %}disabled{% endif %}>Apply</button>
+</form>
+{% if quest_count == 0 %}
+<p class="empty-state">No quest CSV is currently loaded.</p>
+{% endif %}
+<form method="post" action="/admin/team-reset" class="form-inline" onsubmit="return confirm('This will delete all teams and remove members from their teams. Continue?');">
+    <button type="submit">Team&nbsp;Reset</button>
+</form>
 
 <section class="roster-section">
     <h3>Teams&nbsp;&amp;&nbsp;Members</h3>
