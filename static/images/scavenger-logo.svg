@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 360" role="img" aria-labelledby="title desc">
+  <title id="title">Scavenger Hunt 2025 logo</title>
+  <desc id="desc">Badge with text 2025 Scavenger Hunt above a compass and treasure map.</desc>
+  <defs>
+    <linearGradient id="badgeGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#1b5455"/>
+      <stop offset="100%" stop-color="#0e3c3f"/>
+    </linearGradient>
+  </defs>
+  <path d="M160 10c-68 0-120 36-120 104v78c0 24 12 46 32 60l88 62 88-62c20-14 32-36 32-60v-78c0-68-52-104-120-104z" fill="url(#badgeGradient)" stroke="#0a2a2e" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M80 180c0-30 14-54 48-54h64c34 0 48 24 48 54v16c0 12-7 23-18 30l-62 42-62-42c-11-7-18-18-18-30z" fill="#f6ddaf" stroke="#0a2a2e" stroke-width="6" stroke-linejoin="round"/>
+  <path d="M108 210c15-18 38-30 52-14 10 12 24 12 42-8" fill="none" stroke="#8f5b14" stroke-width="6" stroke-linecap="round" stroke-dasharray="12 16"/>
+  <circle cx="210" cy="236" r="56" fill="#1f5f63" stroke="#0a2a2e" stroke-width="8"/>
+  <circle cx="210" cy="236" r="36" fill="#12494d"/>
+  <path d="M210 188l10 38 38 10-38 10-10 38-10-38-38-10 38-10z" fill="#ffbb55"/>
+  <path d="M210 188v48l-48-12z" fill="#0f3135" opacity="0.4"/>
+  <text x="160" y="92" font-family="Montserrat, Arial, sans-serif" font-size="62" font-weight="bold" text-anchor="middle" fill="#f4dca2">2025</text>
+  <text x="160" y="152" font-family="Montserrat, Arial, sans-serif" font-size="58" font-weight="bold" text-anchor="middle" fill="#ffffff" letter-spacing="3">SCAVENGER</text>
+  <text x="160" y="206" font-family="Montserrat, Arial, sans-serif" font-size="60" font-weight="bold" text-anchor="middle" fill="#ffffff" letter-spacing="6">HUNT</text>
+  <text x="210" y="228" font-family="Montserrat, Arial, sans-serif" font-size="24" font-weight="bold" text-anchor="middle" fill="#ffffff">N</text>
+  <path d="M96 236l24-16" stroke="#8f5b14" stroke-width="8" stroke-linecap="round"/>
+</svg>

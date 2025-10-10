@@ -1,7 +1,27 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Judge&nbsp;Dashboard&nbsp;–&nbsp;Teams</h2>
+<h2>Judge&nbsp;Dashboard&nbsp;&mdash;&nbsp;Teams</h2>
+<div class="video-embed">
+    <iframe
+        src="https://www.youtube.com/embed/RlJawHL0d5Q"
+        title="Scavenger Hunt overview video"
+        frameborder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowfullscreen
+    ></iframe>
+</div>
+<section class="scoring">
+    <h3>Scoring</h3>
+    <p>Judges score 1&ndash;4 points for each upload based on completion, creativity, humor, and accuracy. Many quests have bonus points. Scoring criteria:</p>
+    <ul>
+        <li>4 (Outstanding): Creative, hilarious, perfect completion.</li>
+        <li>3 (Good): Accurate with a fun twist.</li>
+        <li>2 (Lackluster): Minimal effort, some mistakes.</li>
+        <li>1 (Tragic): Wrong place, missing items, no creativity.</li>
+        <li>0 (Must have been a butt dial): Not even remotely relevant.</li>
+    </ul>
+</section>
 {% if teams %}
 <ul class="team-list">
     {% for team in teams %}

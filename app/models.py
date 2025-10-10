@@ -130,7 +130,7 @@ class TeamQuest(Base):
     quest = relationship("Quest", back_populates="team_quests")
     latest_media = relationship("MediaUpload", back_populates="team_quest", foreign_keys=[latest_media_id])
     media_uploads = relationship("MediaUpload", back_populates="team_quest", foreign_keys="MediaUpload.team_quest_id")
-    score = relationship("Score", uselist=False, back_populates="team_quest")
+    scores = relationship("Score", back_populates="team_quest")
 
     def __repr__(self) -> str:
         return f"<TeamQuest team_id={self.team_id} quest_id={self.quest_id}>"
@@ -157,7 +157,7 @@ class MediaUpload(Base):
 
 class Score(Base):
     __tablename__ = "scores"
-    __table_args__ = (UniqueConstraint("team_quest_id", name="uq_scores_team_quest"),)
+    __table_args__ = (UniqueConstraint("team_quest_id", "judge_user_id", name="uq_scores_team_judge"),)
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     team_quest_id = Column(Integer, ForeignKey("team_quests.id"), nullable=False)
@@ -166,7 +166,7 @@ class Score(Base):
     scored_at = Column(DateTime, default=_dt.datetime.utcnow)
     updated_at = Column(DateTime, default=_dt.datetime.utcnow, onupdate=_dt.datetime.utcnow)
 
-    team_quest = relationship("TeamQuest", back_populates="score", foreign_keys=[team_quest_id])
+    team_quest = relationship("TeamQuest", back_populates="scores", foreign_keys=[team_quest_id])
     judge = relationship("User")
 
     def __repr__(self) -> str:

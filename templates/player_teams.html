@@ -1,13 +1,8 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Your&nbsp;Team</h2>
-{% if current_team %}
-<p>You are currently in team <strong>{{ current_team.name }}</strong>.</p>
-<p>If you wish to change teams, select an option below.</p>
-{% else %}
-<p>You are not part of a team yet. Join an existing team or create a new one.</p>
-{% endif %}
+<h2>Select&nbsp;Your&nbsp;Team</h2>
+<p>You are not part of a team yet. Join an existing team or create a new one to begin playing.</p>
 
 <h3>Join&nbsp;an&nbsp;Existing&nbsp;Team</h3>
 {% if teams %}

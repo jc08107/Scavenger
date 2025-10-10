@@ -32,7 +32,8 @@ from fastapi import (
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from sqlalchemy.orm import Session
+from sqlalchemy import text
+from sqlalchemy.orm import Session, subqueryload
 
 from starlette.middleware.sessions import SessionMiddleware
 
@@ -76,6 +77,76 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 TEMPLATES_DIR = os.path.join(os.path.dirname(__file__), "templates")
 templates = Jinja2Templates(directory=TEMPLATES_DIR)
 
+MAX_JUDGES = 2
+
+
+def ensure_scores_unique_index() -> None:
+    """Ensure the scores table enforces uniqueness per judge/team quest pair."""
+    engine = database.engine
+    if engine.dialect.name != "sqlite":
+        return
+    with engine.begin() as conn:
+        index_rows = conn.execute(text("PRAGMA index_list('scores')")).fetchall()
+        legacy_unique_indexes: List[str] = []
+        composite_exists = False
+        for idx in index_rows:
+            idx_name = idx[1]
+            is_unique = idx[2] == 1
+            if not is_unique or not idx_name:
+                continue
+            columns = conn.execute(text(f"PRAGMA index_info('{idx_name}')")).fetchall()
+            col_names = [col[2] for col in columns]
+            if col_names == ["team_quest_id"]:
+                legacy_unique_indexes.append(idx_name)
+            if col_names == ["team_quest_id", "judge_user_id"]:
+                composite_exists = True
+        needs_rebuild = any(name.startswith("sqlite_autoindex") for name in legacy_unique_indexes)
+        if needs_rebuild:
+            conn.execute(text("PRAGMA foreign_keys=OFF"))
+            try:
+                conn.execute(text("ALTER TABLE scores RENAME TO scores_old"))
+                conn.execute(
+                    text(
+                        """
+                        CREATE TABLE scores (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            team_quest_id INTEGER NOT NULL,
+                            judge_user_id INTEGER NOT NULL,
+                            score INTEGER NOT NULL,
+                            scored_at DATETIME,
+                            updated_at DATETIME,
+                            FOREIGN KEY(team_quest_id) REFERENCES team_quests(id),
+                            FOREIGN KEY(judge_user_id) REFERENCES users(id),
+                            UNIQUE(team_quest_id, judge_user_id)
+                        )
+                        """
+                    )
+                )
+                conn.execute(
+                    text(
+                        """
+                        INSERT INTO scores (id, team_quest_id, judge_user_id, score, scored_at, updated_at)
+                        SELECT id, team_quest_id, judge_user_id, score, scored_at, updated_at
+                        FROM scores_old
+                        """
+                    )
+                )
+                conn.execute(text("DROP TABLE scores_old"))
+            finally:
+                conn.execute(text("PRAGMA foreign_keys=ON"))
+        else:
+            for idx_name in legacy_unique_indexes:
+                if idx_name.startswith("sqlite_autoindex"):
+                    continue  # auto indexes can only be cleared via rebuild
+                conn.execute(text(f'DROP INDEX IF EXISTS "{idx_name}"'))
+            if not composite_exists:
+                conn.execute(
+                    text(
+                        "CREATE UNIQUE INDEX IF NOT EXISTS uq_scores_team_judge "
+                        "ON scores(team_quest_id, judge_user_id)"
+                    )
+                )
+
 
 @app.on_event("startup")
 def on_startup() -> None:
@@ -99,6 +170,7 @@ def on_startup() -> None:
             db.commit()
     finally:
         db.close()
+    ensure_scores_unique_index()
 
 
 def get_session(db: Session) -> GameSession:
@@ -135,20 +207,29 @@ def ensure_team_quests(db: Session, team: Team, session: GameSession) -> None:
 @app.get("/", response_class=HTMLResponse)
 def root(request: Request) -> HTMLResponse:
     """Home page redirect to login if not authenticated."""
-    if request.session.get("user_id"):
-        # If logged in, redirect based on role selection
-        db = database.SessionLocal()
-        user = db.query(User).filter(User.id == request.session["user_id"]).first()
+    user_id = request.session.get("user_id")
+    if not user_id:
+        return RedirectResponse(url="/login", status_code=302)
+
+    db = database.SessionLocal()
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+    finally:
         db.close()
-        if user and user.role:
-            if user.role == "player":
-                return RedirectResponse(url="/player/teams", status_code=302)
-            elif user.role == "judge":
-                return RedirectResponse(url="/judge/teams", status_code=302)
-            elif user.role == "admin":
-                return RedirectResponse(url="/admin/dashboard", status_code=302)
-        return RedirectResponse(url="/role", status_code=302)
-    return RedirectResponse(url="/login", status_code=302)
+
+    if not user:
+        request.session.clear()
+        return RedirectResponse(url="/login", status_code=302)
+
+    if user.role == "player":
+        if user.team_id:
+            return RedirectResponse(url="/player/home", status_code=302)
+        return RedirectResponse(url="/player/teams", status_code=302)
+    if user.role == "judge":
+        return RedirectResponse(url="/judge/teams", status_code=302)
+    if user.role == "admin":
+        return RedirectResponse(url="/admin/dashboard", status_code=302)
+    return RedirectResponse(url="/role", status_code=302)
 
 
 @app.get("/signup", response_class=HTMLResponse)
@@ -227,16 +308,38 @@ def logout(request: Request) -> RedirectResponse:
 
 
 @app.get("/role", response_class=HTMLResponse)
-def role_get(request: Request, user: User = Depends(get_current_user)) -> HTMLResponse:
+def role_get(
+    request: Request,
+    db: Session = Depends(database.get_db),
+    user: User = Depends(get_current_user),
+) -> HTMLResponse:
     if user.role:
         # If already selected role, redirect
         if user.role == "player":
-            return RedirectResponse(url="/player/teams", status_code=302)
+            target = "/player/home" if user.team_id else "/player/teams"
+            return RedirectResponse(url=target, status_code=302)
         elif user.role == "judge":
             return RedirectResponse(url="/judge/teams", status_code=302)
         elif user.role == "admin":
             return RedirectResponse(url="/admin/dashboard", status_code=302)
-    return templates.TemplateResponse("role_select.html", {"request": request})
+    admin_taken = db.query(User).filter(User.role == "admin").first() is not None
+    judge_count = db.query(User).filter(User.role == "judge").count()
+    judge_slots_available = max(MAX_JUDGES - judge_count, 0)
+    judge_available = judge_slots_available > 0 or user.role == "judge"
+    if admin_taken and judge_slots_available == 0 and not user.role:
+        user.role = "player"
+        db.commit()
+        target = "/player/home" if user.team_id else "/player/teams"
+        return RedirectResponse(url=target, status_code=302)
+    return templates.TemplateResponse(
+        "role_select.html",
+        {
+            "request": request,
+            "admin_available": not admin_taken,
+            "judge_available": judge_available,
+            "judge_slots_available": judge_slots_available,
+        },
+    )
 
 
 @app.post("/role")
@@ -244,11 +347,24 @@ def role_post(request: Request, role: str = Form(...), db: Session = Depends(dat
     # Only allow valid roles
     if role not in {"player", "judge", "admin"}:
         raise HTTPException(400, detail="Invalid role selected")
+    if role == "admin":
+        existing_admin = db.query(User).filter(User.role == "admin").first()
+        if existing_admin and existing_admin.id != user.id:
+            raise HTTPException(400, detail="Admin role already assigned")
+    if role == "judge":
+        other_judges = (
+            db.query(User)
+            .filter(User.role == "judge", User.id != user.id)
+            .count()
+        )
+        if other_judges >= MAX_JUDGES:
+            raise HTTPException(400, detail="Judge roles are already filled")
     user.role = role
     db.commit()
     # Redirect accordingly
     if role == "player":
-        return RedirectResponse(url="/player/teams", status_code=302)
+        next_url = "/player/home" if user.team_id else "/player/teams"
+        return RedirectResponse(url=next_url, status_code=302)
     elif role == "judge":
         return RedirectResponse(url="/judge/teams", status_code=302)
     else:
@@ -259,10 +375,16 @@ def role_post(request: Request, role: str = Form(...), db: Session = Depends(dat
 
 @app.get("/player/teams", response_class=HTMLResponse)
 def player_teams_get(request: Request, db: Session = Depends(database.get_db), user: User = Depends(require_role("player"))) -> HTMLResponse:
+    if user.team_id:
+        return RedirectResponse(url="/player/home", status_code=302)
     # Retrieve existing teams
     teams = db.query(Team).all()
     return templates.TemplateResponse(
-        "player_teams.html", {"request": request, "teams": teams, "current_team": user.team}
+        "player_teams.html",
+        {
+            "request": request,
+            "teams": teams,
+        },
     )
 
 
@@ -274,6 +396,8 @@ def player_teams_post(
     db: Session = Depends(database.get_db),
     user: User = Depends(require_role("player")),
 ) -> RedirectResponse:
+    if user.team_id:
+        return RedirectResponse(url="/player/home", status_code=302)
     session = get_session(db)
 
     # Normalize inputs
@@ -296,7 +420,7 @@ def player_teams_post(
         user.is_team_leader = True
         db.commit()
         ensure_team_quests(db, team, session)
-        return RedirectResponse(url="/player/quests", status_code=302)
+        return RedirectResponse(url="/player/home", status_code=302)
 
     # Join existing team if a non-empty team_id was submitted
     if team_id:
@@ -311,11 +435,42 @@ def player_teams_post(
         user.is_team_leader = False
         db.commit()
         ensure_team_quests(db, team, session)
-        return RedirectResponse(url="/player/quests", status_code=302)
+        return RedirectResponse(url="/player/home", status_code=302)
 
     # Neither a new name nor a valid team_id was provided
     raise HTTPException(400, detail="Please choose a team or enter a new team name")
 
+
+@app.get("/player/home", response_class=HTMLResponse)
+def player_home(
+    request: Request,
+    db: Session = Depends(database.get_db),
+    user: User = Depends(require_role("player")),
+) -> HTMLResponse:
+    if not user.team_id:
+        return RedirectResponse(url="/player/teams", status_code=302)
+
+    team = db.query(Team).filter(Team.id == user.team_id).first()
+    if not team:
+        user.team_id = None
+        user.is_team_leader = False
+        db.commit()
+        return RedirectResponse(url="/player/teams", status_code=302)
+
+    roster = (
+        db.query(User)
+        .filter(User.team_id == team.id)
+        .order_by(User.first_name.asc(), User.id.asc())
+        .all()
+    )
+    return templates.TemplateResponse(
+        "player_home.html",
+        {
+            "request": request,
+            "team": team,
+            "roster": roster,
+        },
+    )
 
 
 @app.get("/player/quests", response_class=HTMLResponse)
@@ -439,6 +594,15 @@ def judge_ballot_get(
         .order_by(Quest.id)
         .all()
     )
+    team_quest_ids = [tq.id for tq in team_quests]
+    scores_for_user = {}
+    if team_quest_ids:
+        user_scores = (
+            db.query(Score)
+            .filter(Score.team_quest_id.in_(team_quest_ids), Score.judge_user_id == user.id)
+            .all()
+        )
+        scores_for_user = {score.team_quest_id: score for score in user_scores}
     quests_data = []
     for tq in team_quests:
         media = tq.latest_media
@@ -447,7 +611,7 @@ def judge_ballot_get(
         if media:
             status = "uploaded"
             media_url = f"/static/{media.file_path}"
-        score_record = tq.score
+        score_record = scores_for_user.get(tq.id)
         score_value = score_record.score if score_record else None
         quests_data.append({
             "team_quest_id": tq.id,
@@ -484,7 +648,11 @@ def judge_score_post(
     if not tq:
         raise HTTPException(404, detail="TeamQuest not found")
     # Upsert score
-    score_record = db.query(Score).filter(Score.team_quest_id == tq.id).first()
+    score_record = (
+        db.query(Score)
+        .filter(Score.team_quest_id == tq.id, Score.judge_user_id == user.id)
+        .first()
+    )
     if not score_record:
         score_record = Score(team_quest_id=tq.id, judge_user_id=user.id, score=score)
         db.add(score_record)
@@ -509,14 +677,44 @@ def judge_team_results(
     session = get_session(db)
     # Ensure team quests exist
     ensure_team_quests(db, team, session)
-    # Check for outstanding scores
+    team_quests = (
+        db.query(TeamQuest)
+        .filter(TeamQuest.team_id == team.id)
+        .join(Quest)
+        .filter(Quest.session_id == session.id)
+        .options(
+            subqueryload(TeamQuest.scores),
+            subqueryload(TeamQuest.quest),
+            subqueryload(TeamQuest.latest_media),
+        )
+        .order_by(Quest.id)
+        .all()
+    )
     outstanding = []
-    for tq in db.query(TeamQuest).filter(TeamQuest.team_id == team.id).all():
-        if tq.latest_media and not tq.score:
+    quest_rows = []
+    for tq in team_quests:
+        judge_score = None
+        all_scores = []
+        for score_entry in tq.scores:
+            all_scores.append(score_entry.score)
+            if score_entry.judge_user_id == user.id:
+                judge_score = score_entry.score
+        if tq.latest_media and judge_score is None:
             outstanding.append(tq)
+        average_score = None
+        if all_scores:
+            average_score = round(sum(all_scores) / len(all_scores), 2)
+        quest_rows.append(
+            {
+                "quest_uid": tq.quest.quest_uid,
+                "description": tq.quest.description,
+                "points_label": tq.quest.points_label,
+                "your_score": judge_score,
+                "average_score": average_score,
+            }
+        )
     if outstanding:
-        # Show outstanding list
-        out_info = [f"{tq.quest.quest_uid}" for tq in outstanding]
+        out_info = [tq.quest.quest_uid for tq in outstanding]
         return templates.TemplateResponse(
             "judge_outstanding.html",
             {
@@ -525,17 +723,25 @@ def judge_team_results(
                 "outstanding": out_info,
             },
         )
-    # Otherwise compute totals
-    total_score = 0
-    scores = db.query(Score).join(TeamQuest).filter(TeamQuest.team_id == team.id).all()
-    for s in scores:
-        total_score += s.score
+    your_scores = [row["your_score"] for row in quest_rows if row["your_score"] is not None]
+    your_total = sum(your_scores)
+    average_values = [row["average_score"] for row in quest_rows if row["average_score"] is not None]
+    average_total = round(sum(average_values), 2) if average_values else None
+    judge_ids = {
+        score_entry.judge_user_id
+        for tq in team_quests
+        for score_entry in tq.scores
+    }
+    judge_count = len(judge_ids)
     return templates.TemplateResponse(
         "judge_team_results.html",
         {
             "request": request,
             "team": team,
-            "total_score": total_score,
+            "quests": quest_rows,
+            "your_total": your_total,
+            "average_total": average_total,
+            "judge_count": judge_count,
         },
     )
 
@@ -547,11 +753,29 @@ def admin_dashboard(
     request: Request, db: Session = Depends(database.get_db), user: User = Depends(require_role("admin"))
 ) -> HTMLResponse:
     session = get_session(db)
+    teams = (
+        db.query(Team)
+        .options(subqueryload(Team.members))
+        .order_by(Team.name.asc())
+        .all()
+    )
+    team_groups = []
+    for team in teams:
+        members = sorted(team.members, key=lambda member: member.first_name.lower())
+        team_groups.append({"team": team, "members": members})
+    awaiting_members = (
+        db.query(User)
+        .filter(User.team_id.is_(None))
+        .order_by(User.first_name.asc())
+        .all()
+    )
     return templates.TemplateResponse(
         "admin_dashboard.html",
         {
             "request": request,
             "game_state": session.state,
+            "team_groups": team_groups,
+            "awaiting_members": awaiting_members,
         },
     )
 
@@ -590,7 +814,11 @@ def admin_upload_post(
     user: User = Depends(require_role("admin")),
 ) -> RedirectResponse:
     # Parse CSV file; expected columns: quest_uid, description, media_required, points_label
-    contents = file.file.read().decode("utf-8")
+    raw_bytes = file.file.read()
+    try:
+        contents = raw_bytes.decode("utf-8")
+    except UnicodeDecodeError:
+        contents = raw_bytes.decode("cp1252")
     reader = csv.DictReader(contents.splitlines())
     session = get_session(db)
     for row in reader:
@@ -598,21 +826,21 @@ def admin_upload_post(
         desc = row.get("description")
         media_required = row.get("media_required")
         points_label = row.get("points_label")
-        if not uid or not desc or not media_required or not points_label:
+        if not uid or not desc or not media_required:
             continue  # skip incomplete rows
         # Check existing quest
         quest = db.query(Quest).filter(Quest.quest_uid == uid).first()
         if quest:
             quest.description = desc
             quest.media_required = media_required
-            quest.points_label = points_label
+            quest.points_label = points_label or ""
         else:
             quest = Quest(
                 session_id=session.id,
                 quest_uid=uid,
                 description=desc,
                 media_required=media_required,
-                points_label=points_label,
+                points_label=points_label or "",
             )
             db.add(quest)
     db.commit()

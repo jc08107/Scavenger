@@ -161,8 +161,73 @@ tr.uploaded {
     gap: 0.5rem;
 }
 
+.login-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 0.75rem;
+    margin-bottom: 1rem;
+}
+
+.login-logo {
+    width: 160px;
+    height: auto;
+}
+
+.roster-section {
+    margin-top: 2rem;
+}
+
+.team-roster {
+    margin-bottom: 1.5rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #e0e0e0;
+}
+
+.team-roster h4 {
+    margin-bottom: 0.5rem;
+}
+
+.member-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+}
+
+.member-list li {
+    padding: 0.25rem 0;
+}
+
+.role-tag {
+    font-size: 0.85rem;
+    color: #555;
+}
+
+.empty-state {
+    color: #666;
+    font-style: italic;
+}
+
 /* Ensure form controls and buttons meet WCAG minimum target size of 44x44 pixels */
 input[type="file"], input[type="number"], select, button {
     min-width: 44px;
     min-height: 44px;
+}
+
+/* Keep embedded videos responsive across layouts */
+.video-embed {
+    position: relative;
+    padding-top: 56.25%;
+    margin: 1rem 0;
+    width: 100%;
+}
+
+.video-embed iframe {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    border: 0;
 }

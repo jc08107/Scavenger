@@ -13,4 +13,50 @@
     <button type="submit">Update</button>
 </form>
 <p><a href="/admin/upload-quests">Upload&nbsp;Quest&nbsp;CSV</a></p>
+
+<section class="roster-section">
+    <h3>Teams&nbsp;&amp;&nbsp;Members</h3>
+    {% if team_groups %}
+        {% for group in team_groups %}
+        <div class="team-roster">
+            <h4>{{ group.team.name }}</h4>
+            {% if group.members %}
+            <ul class="member-list">
+                {% for member in group.members %}
+                <li>{{ member.first_name }}{% if member.role and member.role != 'player' %} <span class="role-tag">{{ member.role|capitalize }}</span>{% endif %}</li>
+                {% endfor %}
+            </ul>
+            {% else %}
+            <p class="empty-state">No members in this team yet.</p>
+            {% endif %}
+        </div>
+        {% endfor %}
+    {% else %}
+    <p class="empty-state">No teams have been created yet.</p>
+    {% endif %}
+</section>
+
+<section class="roster-section">
+    <h3>Awaiting&nbsp;Team&nbsp;Selection</h3>
+    {% if awaiting_members %}
+    <table>
+        <thead>
+            <tr>
+                <th>First&nbsp;Name</th>
+                <th>Role</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for member in awaiting_members %}
+            <tr>
+                <td>{{ member.first_name }}</td>
+                <td>{{ member.role|capitalize if member.role else 'Pending' }}</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+    {% else %}
+    <p class="empty-state">All members have selected a team.</p>
+    {% endif %}
+</section>
 {% endblock %}

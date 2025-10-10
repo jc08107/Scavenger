@@ -1,7 +1,15 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Log&nbsp;In</h2>
+<div class="login-header">
+    <img src="{{ url_for('static', path='images/scavenger-logo-2025.jpeg') }}" alt="2025 Scavenger Hunt logo" class="login-logo">
+    <h2>Log&nbsp;In</h2>
+</div>
+<div class="event-details">
+    <p><strong>Date:</strong> Saturday, November 1, 2025</p>
+    <p><strong>Location:</strong> Bike Stop</p>
+    <p><strong>Time:</strong> 3:00 PM</p>
+</div>
 {% if error %}
 <p class="error">{{ error }}</p>
 {% endif %}

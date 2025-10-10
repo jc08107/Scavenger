@@ -9,14 +9,20 @@
             <input type="radio" name="role" value="player" required>
             Player
         </label>
+        {% if judge_available %}
         <label class="role-option">
             <input type="radio" name="role" value="judge">
-            Judge
+            Judge{% if judge_slots_available is defined and judge_slots_available > 0 %} ({{ judge_slots_available }} slot{% if judge_slots_available != 1 %}s{% endif %} left){% endif %}
         </label>
+        {% elif judge_slots_available is defined and judge_slots_available == 0 %}
+        <p class="role-note">All judge slots are filled.</p>
+        {% endif %}
+        {% if admin_available %}
         <label class="role-option">
             <input type="radio" name="role" value="admin">
             Admin
         </label>
+        {% endif %}
     </fieldset>
     <button type="submit">Continue</button>
 </form>

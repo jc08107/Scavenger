@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Team&nbsp;{{ team.name }}</h2>
+<div class="video-embed">
+    <iframe
+        src="https://www.youtube.com/embed/RlJawHL0d5Q"
+        title="Scavenger Hunt overview video"
+        frameborder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+        allowfullscreen
+    ></iframe>
+</div>
+<p>You are a member of <strong>{{ team.name }}</strong>. Check in here to see who else is on your team.</p>
+
+<h3>Team&nbsp;Roster</h3>
+{% if roster %}
+<table>
+    <thead>
+        <tr>
+            <th>First&nbsp;Name</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for member in roster %}
+        <tr>
+            <td>{{ member.first_name }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% else %}
+<p>No teammates have joined yet.</p>
+{% endif %}
+
+<p><a href="/player/quests">View&nbsp;team&nbsp;quests</a></p>
+
+<section class="terms-of-service">
+    <h3>Terms of Service</h3>
+    <ol>
+        <li>
+            <strong>Consent</strong>
+            <p>By uploading photos, videos, or text (&ldquo;uploads&rdquo;), you confirm you created the content or have permission to use it (and from the copyright owner, if applicable). Don&rsquo;t upload anything illegal, harmful, or that you don&rsquo;t have the right to share.</p>
+        </li>
+        <li>
+            <strong>How to Request Removal</strong>
+            <p>If you&rsquo;d like something to be deleted after the game&mdash;because you appear in it, own it, or have another concern&mdash;just ask the judge by referencing your team name and the quest number. Uploaded media and user accounts (including login information) will be wiped from the online database as soon as Jason gets around to it after the game. Still, downloaded copies may exist, subject to section 3, below.</p>
+        </li>
+        <li>
+            <strong>Who Can See Uploads</strong>
+            <p>You keep your copyright. By uploading, you grant all participants a limited license to display your content for judging, event operations, and non-commercial recap materials. Uploads may be visible to event organizers, judges, and participants for scoring, highlight reels, and recap posts. By uploading, you agree that we may display your content to this group for the duration of the event and the related wrap-up, unless the judge is notified beforehand.</p>
+        </li>
+        <li>
+            <strong>Be Kind, Be Safe, Don&rsquo;t Break the Law</strong>
+            <p>No harassment or dangerous stunts. Follow venue rules and local laws. Drinking challenges may be substituted for water.</p>
+        </li>
+    </ol>
+    <h4>Scoring</h4>
+    <p>Judges score 1&ndash;4 points for each upload based on completion, creativity, humor, and accuracy. Many quests have bonus points. Scoring criteria:</p>
+    <ul>
+        <li>4 (Outstanding): Creative, hilarious, perfect completion.</li>
+        <li>3 (Good): Accurate with a fun twist.</li>
+        <li>2 (Lackluster): Minimal effort, some mistakes.</li>
+        <li>1 (Tragic): Wrong place, missing items, no creativity.</li>
+        <li>0 (Must have been a butt dial): Not even remotely relevant.</li>
+    </ul>
+</section>
+{% endblock %}

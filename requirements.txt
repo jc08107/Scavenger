@@ -5,3 +5,4 @@ passlib[bcrypt]
 python-multipart
 jinja2
 itsdangerous>=2.1
+pytest
