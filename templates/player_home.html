@@ -1,71 +1,173 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h2>Team&nbsp;{{ team.name }}</h2>
-<form method="get" action="/player/team-name">
-    <button type="submit">Change Team Name</button>
-</form>
-<div class="video-embed">
-    <iframe
-        src="https://www.youtube.com/embed/RlJawHL0d5Q"
-        title="Scavenger Hunt overview video"
-        frameborder="0"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-        allowfullscreen
-    ></iframe>
-</div>
-<p>You are a member of <strong>{{ team.name }}</strong>. Check in here to see who else is on your team.</p>
+<style>
+  :root{
+    --bg-overlay: rgba(6, 18, 25, 0.55);
+    --card-bg: rgba(255,255,255,0.12);
+    --card-border: rgba(255,255,255,0.25);
+    --text: #e9f6ff;
+    --muted: #b6d7e7;
+    --accent-1: #00e0ff;
+    --accent-2: #ff7a59;
+    --glow: 0 0 24px rgba(0, 224, 255, 0.45);
+  }
+  body {
+    color: var(--text);
+    background: #061219;
+  }
 
-<h3>Team&nbsp;Roster</h3>
-{% if roster %}
-<table>
-    <thead>
-        <tr>
-            <th>First&nbsp;Name</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for member in roster %}
-        <tr>
-            <td>{{ member.first_name }}</td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
-{% else %}
-<p>No teammates have joined yet.</p>
-{% endif %}
+  main {
+    background: transparent !important;
+    box-shadow: none;
+    max-width: none;
+    padding: 0;
+  }
 
-<p><a href="/player/quests">View&nbsp;team&nbsp;quests</a></p>
+  .page-bg {
+    position: fixed; inset: 0;
+    background: radial-gradient(1200px 600px at 10% 0%, rgba(0,224,255,0.12), transparent 60%),
+      radial-gradient(900px 500px at 90% 100%, rgba(255,122,89,0.12), transparent 60%),
+      linear-gradient(180deg, #0a1a24, #0b2e35 40%, #0b3941);
+  }
+  .page-bg::after {
+    content: "";
+    position: absolute; inset: 0;
+    background: url('{{ url_for("static", path="images/bg_scavenger_map_1.png") }}') center/cover no-repeat;
+    opacity: .35;
+    mix-blend-mode: screen;
+  }
 
-<section class="terms-of-service">
-    <h3>Terms of Service</h3>
-    <ol>
-        <li>
-            <strong>Consent</strong>
-            <p>By uploading photos, videos, or text (&ldquo;uploads&rdquo;), you confirm you created the content or have permission to use it (and from the copyright owner, if applicable). Don&rsquo;t upload anything illegal, harmful, or that you don&rsquo;t have the right to share.</p>
+  .shell { position: relative; z-index: 1; max-width: 1100px; margin: 2.25rem auto 3rem; padding: .75rem 1rem; }
+
+  .hero {
+    display: grid; grid-template-columns: 1fr auto; gap: 1rem; align-items: end; margin-bottom: 1.25rem;
+  }
+  .hero h2 {
+    font-family: "Bebas Neue", system-ui, sans-serif; font-size: clamp(2.1rem, 4.2vw + 1rem, 4rem);
+    letter-spacing: .02em; margin: 0; color: #e8ffff; text-shadow: var(--glow);
+  }
+  .hero-actions {
+    display: inline-flex;
+    gap: .75rem;
+    align-items: center;
+  }
+  .hero-actions form {
+    margin: 0;
+  }
+
+  .btn {
+    display: inline-block; padding: .7rem 1rem; border-radius: 999px; font-weight: 700;
+    background: linear-gradient(90deg, var(--accent-2), #ffc371); color: white; text-decoration: none;
+    border: 1px solid rgba(255,255,255,.25); box-shadow: 0 8px 24px rgba(0,0,0,.35);
+    transition: transform .15s ease, filter .15s ease;
+  }
+  .btn:hover { transform: translateY(-1px); filter: brightness(1.05); }
+  .btn--outline { background: transparent; color: var(--text); border: 1px solid var(--card-border); backdrop-filter: blur(10px); }
+
+  .grid { display: grid; gap: 1rem; grid-template-columns: repeat(12, 1fr); }
+  .col-8 { grid-column: span 8; } .col-4 { grid-column: span 4; }
+  @media (max-width: 920px) {
+    .hero { grid-template-columns: 1fr; }
+    .hero-actions { justify-content: flex-start; }
+    .col-8, .col-4 { grid-column: 1 / -1; }
+  }
+
+  .card {
+    background: var(--card-bg); backdrop-filter: blur(10px);
+    border: 1px solid var(--card-border); border-radius: 16px; padding: 1rem;
+    box-shadow: 0 6px 24px rgba(0,0,0,.35);
+  }
+  .card h3 { margin-top: 0; color: #e7fbff; letter-spacing: .02em; }
+  .muted { color: var(--muted); }
+
+  .video-embed { position: relative; width: 100%; aspect-ratio: 16/9; }
+  .video-embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; border-radius: 12px; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 1rem; }
+  thead th { text-align: left; padding: .6rem .7rem; color: #dff7ff; border-bottom: 1px solid var(--card-border); background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02)); }
+  tbody td { padding: .6rem .7rem; border-bottom: 1px dashed rgba(255,255,255,.15); }
+  tbody tr:hover td { background: rgba(255,255,255,.04); }
+
+  .cta-row { display: flex; gap: .75rem; align-items: center; margin: .75rem 0 1.25rem; }
+  a.button { display: inline-block; padding: .8rem 1.2rem; border-radius: 999px; font-weight: 800; text-decoration: none; color: white; background: linear-gradient(90deg, var(--accent-2), #ffb36b); box-shadow: 0 10px 28px rgba(255,122,89,.35); }
+  a.button:hover { transform: translateY(-1px); filter: brightness(1.06); }
+
+  .terms-of-service { grid-column: 1 / -1; }
+  .terms-of-service ol { padding-left: 1.1rem; }
+  .terms-of-service li + li { margin-top: .65rem; }
+</style>
+
+<div class="page-bg" aria-hidden="true"></div>
+
+<div class="shell">
+  <div class="hero">
+    <h2>Team {{ team.name }}</h2>
+    <div class="hero-actions">
+      <form method="get" action="/player/team-name">
+        <button class="btn btn--outline" type="submit">Change Team Name</button>
+      </form>
+      <a class="btn btn--outline" href="/logout">Log Out</a>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="card col-8">
+      <div class="video-embed">
+        <iframe src="https://www.youtube.com/embed/RlJawHL0d5Q" title="Scavenger Hunt overview video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+      </div>
+      <p class="muted" style="margin-top:.6rem;">You are a member of <strong>{{ team.name }}</strong>. Check in here to see who else is on your team.</p>
+      <div class="cta-row">
+        <a href="/player/quests" class="button">View Team Quests</a>
+      </div>
+    </div>
+
+    <div class="card col-4">
+      <h3>Team Roster</h3>
+      {% if roster %}
+      <table>
+        <thead><tr><th>First Name</th></tr></thead>
+        <tbody>
+          {% for member in roster %}
+          <tr><td>{{ member.first_name }}</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p class="muted">No teammates have joined yet.</p>
+      {% endif %}
+    </div>
+
+    <div class="card terms-of-service">
+      <h3>Terms of Service</h3>
+      <ol>
+        <li><strong>Consent</strong>
+          <p>By uploading photos, videos, or text (&ldquo;uploads&rdquo;), you confirm you created the content or have permission to use it (and from the copyright owner, if applicable). Do not upload anything illegal, harmful, or that you do not have the right to share.</p>
         </li>
-        <li>
-            <strong>How to Request Removal</strong>
-            <p>If you&rsquo;d like something to be deleted after the game&mdash;because you appear in it, own it, or have another concern&mdash;just ask the judge by referencing your team name and the quest number. Uploaded media and user accounts (including login information) will be wiped from the online database as soon as Jason gets around to it after the game. Still, downloaded copies may exist, subject to section 3, below.</p>
+        <li><strong>How to Request Removal</strong>
+          <p>If you would like something to be deleted after the game&mdash;because you appear in it, own it, or have another concern&mdash;just ask the judge by referencing your team name and the quest number. Uploaded media and user accounts (including login information) will be wiped from the online database as soon as Jason gets around to it after the game. Still, downloaded copies may exist, subject to section 3, below.</p>
         </li>
-        <li>
-            <strong>Who Can See Uploads</strong>
-            <p>You keep your copyright. By uploading, you grant all participants a limited license to display your content for judging, event operations, and non-commercial recap materials. Uploads may be visible to event organizers, judges, and participants for scoring, highlight reels, and recap posts. By uploading, you agree that we may display your content to this group for the duration of the event and the related wrap-up, unless the judge is notified beforehand.</p>
+        <li><strong>Who Can See Uploads</strong>
+          <p>You keep your copyright. By uploading, you grant all participants a limited license to display your content for judging, event operations, and non-commercial recap materials. Uploads may be visible to event organizers, judges, and participants for scoring, highlight reels, and recap posts. By uploading, you agree that we may display your content to this group for the duration of the event and the related wrap-up, unless the judge is notified beforehand.</p>
         </li>
-        <li>
-            <strong>Be Kind, Be Safe, Don&rsquo;t Break the Law</strong>
-            <p>No harassment or dangerous stunts. Follow venue rules and local laws. Drinking challenges may be substituted for water.</p>
+        <li><strong>Be Kind, Be Safe, Do Not Break the Law</strong>
+          <p>No harassment or dangerous stunts. Follow venue rules and local laws. Drinking challenges may be substituted for water.</p>
         </li>
-    </ol>
-    <h4>Scoring</h4>
-    <p>Judges score 1&ndash;4 points for each upload based on completion, creativity, humor, and accuracy. Many quests have bonus points. Scoring criteria:</p>
-    <ul>
+      </ol>
+      <h4>Scoring</h4>
+      <p>Judges score 1&ndash;4 points for each upload based on completion, creativity, humor, and accuracy. Many quests have bonus points. Scoring criteria:</p>
+      <ul>
         <li>4 (Outstanding): Creative, hilarious, perfect completion.</li>
         <li>3 (Good): Accurate with a fun twist.</li>
         <li>2 (Lackluster): Minimal effort, some mistakes.</li>
         <li>1 (Tragic): Wrong place, missing items, no creativity.</li>
         <li>0 (Must have been a butt dial): Not even remotely relevant.</li>
-    </ul>
-</section>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&display=swap" rel="stylesheet">
 {% endblock %}
