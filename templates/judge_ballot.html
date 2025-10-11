@@ -18,7 +18,7 @@
             {% for q in quests %}
             <tr class="{% if q.status == 'uploaded' and q.score is not none %}uploaded{% endif %}">
                 <td>{{ q.quest_uid }}</td>
-                <td>{{ q.description }}</td>
+            <td>{{ q.description|urlize(target='_blank', rel='noopener noreferrer') }}</td>
                 <td>{{ q.media_required }}</td>
                 <td>{{ q.points_label }}</td>
                 <td>
