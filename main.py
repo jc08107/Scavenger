@@ -250,13 +250,13 @@ def reset_session_quests(db: Session, session: GameSession) -> None:
 
 
 def reset_all_teams(db: Session) -> None:
-    """Remove all teams and clear member associations between games."""
+    """Remove all teams, clear member associations, and free up judge slots."""
     teams = db.query(Team).all()
-    if not teams:
-        return
     team_ids = [team.id for team in teams]
-    team_quests = db.query(TeamQuest).filter(TeamQuest.team_id.in_(team_ids)).all()
-    team_quest_ids = [tq.id for tq in team_quests]
+    team_quest_ids: List[int] = []
+    if team_ids:
+        team_quests = db.query(TeamQuest).filter(TeamQuest.team_id.in_(team_ids)).all()
+        team_quest_ids = [tq.id for tq in team_quests]
 
     if team_quest_ids:
         media_uploads = (
@@ -279,7 +279,15 @@ def reset_all_teams(db: Session) -> None:
         {User.team_id: None, User.is_team_leader: False},
         synchronize_session=False,
     )
-    db.query(Team).filter(Team.id.in_(team_ids)).delete(synchronize_session=False)
+    db.query(User).filter(
+        User.role.isnot(None),
+        User.role != "admin",
+    ).update(
+        {User.role: None},
+        synchronize_session=False,
+    )
+    if team_ids:
+        db.query(Team).filter(Team.id.in_(team_ids)).delete(synchronize_session=False)
 
     return
 
@@ -879,6 +887,12 @@ def admin_dashboard(
         .order_by(User.first_name.asc())
         .all()
     )
+    transfer_judges = (
+        db.query(User)
+        .filter(User.role == "judge")
+        .order_by(User.first_name.asc())
+        .all()
+    )
     team_groups = []
     for team in teams:
         members = sorted(team.members, key=lambda member: member.first_name.lower())
@@ -889,6 +903,8 @@ def admin_dashboard(
         .order_by(User.first_name.asc())
         .all()
     )
+    judge_count = len(transfer_judges)
+    judge_slots_available = max(MAX_JUDGES - judge_count, 0)
     quest_count = db.query(Quest).filter(Quest.session_id == session.id).count()
     transfer_teams = []
     for team in teams:
@@ -908,9 +924,12 @@ def admin_dashboard(
             "awaiting_members": awaiting_members,
             "quest_count": quest_count,
             "transfer_players": transfer_players,
+            "transfer_judges": transfer_judges,
             "transfer_teams": transfer_teams,
             "transfer_message": transfer_message,
             "transfer_error": transfer_error,
+            "judge_slots_available": judge_slots_available,
+            "max_judges": MAX_JUDGES,
         },
     )
 
@@ -1011,8 +1030,9 @@ def admin_team_reset(
 @app.post("/admin/transfer-player")
 def admin_transfer_player(
     request: Request,
-    player_id: int = Form(...),
-    target_team_id: int = Form(...),
+    member_id: int = Form(...),
+    transfer_action: str = Form(...),
+    target_team_id: Optional[int] = Form(None),
     db: Session = Depends(database.get_db),
     user: User = Depends(require_role("admin")),
 ) -> RedirectResponse:
@@ -1020,39 +1040,66 @@ def admin_transfer_player(
         encoded = quote(message)
         return RedirectResponse(url=f"/admin/dashboard?{key}={encoded}", status_code=302)
 
-    player = (
+    member = (
         db.query(User)
-        .filter(User.id == player_id, User.role == "player")
+        .filter(User.id == member_id, User.role != "admin")
         .options(subqueryload(User.team))
         .first()
     )
-    if not player:
-        return redirect_with_feedback("transfer_error", "Player not found.")
-    if player.team_id is None:
-        return redirect_with_feedback("transfer_error", "This player is not currently assigned to a team.")
-    try:
-        target_team_id_int = int(target_team_id)
-    except (TypeError, ValueError):
-        return redirect_with_feedback("transfer_error", "Please select a valid team to transfer to.")
-    target_team = db.query(Team).filter(Team.id == target_team_id_int).first()
-    if not target_team:
-        return redirect_with_feedback("transfer_error", "Selected team could not be found.")
-    if player.team_id == target_team.id:
-        return redirect_with_feedback("transfer_error", "Player is already on that team.")
-    member_count = db.query(User).filter(User.team_id == target_team.id).count()
-    if member_count >= 9:
-        return redirect_with_feedback("transfer_error", "Selected team already has the maximum of 9 players.")
+    if not member:
+        return redirect_with_feedback("transfer_error", "Member not found or cannot be modified.")
 
-    player.team_id = target_team.id
-    player.is_team_leader = False
-    db.commit()
+    action = transfer_action.strip().lower()
+    if action == "move_to_team":
+        if target_team_id is None:
+            return redirect_with_feedback("transfer_error", "Please select a team to transfer to.")
+        try:
+            target_team_id_int = int(target_team_id)
+        except (TypeError, ValueError):
+            return redirect_with_feedback("transfer_error", "Please select a valid team to transfer to.")
+        target_team = db.query(Team).filter(Team.id == target_team_id_int).first()
+        if not target_team:
+            return redirect_with_feedback("transfer_error", "Selected team could not be found.")
+        if member.team_id == target_team.id:
+            return redirect_with_feedback("transfer_error", "Member is already on that team.")
+        member_count = db.query(User).filter(User.team_id == target_team.id).count()
+        if member_count >= 9:
+            return redirect_with_feedback("transfer_error", "Selected team already has the maximum of 9 players.")
 
-    session = get_session(db)
-    ensure_team_quests(db, target_team, session)
+        if member.role == "judge" or member.role is None:
+            member.role = "player"
+        member.team_id = target_team.id
+        member.is_team_leader = False
+        db.commit()
 
-    player_name = player.first_name
-    new_team_name = target_team.name
-    return redirect_with_feedback(
-        "transfer_message",
-        f"{player_name} has been transferred to {new_team_name}.",
-    )
+        session = get_session(db)
+        ensure_team_quests(db, target_team, session)
+
+        member_name = member.first_name
+        new_team_name = target_team.name
+        return redirect_with_feedback(
+            "transfer_message",
+            f"{member_name} has been transferred to {new_team_name}.",
+        )
+    if action == "promote_to_judge":
+        if member.role != "player" or member.team_id is None:
+            return redirect_with_feedback(
+                "transfer_error",
+                "Only players currently on a team can be promoted to judge.",
+            )
+        judge_count = db.query(User).filter(User.role == "judge").count()
+        if judge_count >= MAX_JUDGES:
+            return redirect_with_feedback(
+                "transfer_error",
+                "Judge roles are already filled.",
+            )
+        member.team_id = None
+        member.is_team_leader = False
+        member.role = "judge"
+        db.commit()
+        return redirect_with_feedback(
+            "transfer_message",
+            f"{member.first_name} is now assigned as a judge.",
+        )
+
+    return redirect_with_feedback("transfer_error", "Unsupported transfer action requested.")

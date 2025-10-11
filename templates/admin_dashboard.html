@@ -28,35 +28,68 @@
     <button type="submit">Team&nbsp;Reset</button>
 </form>
 <section class="transfer-section">
-    <h3>Transfer&nbsp;Team&nbsp;Member</h3>
+    <h3>Role&nbsp;&amp;&nbsp;Team&nbsp;Transfers</h3>
     {% if transfer_error %}
     <p class="alert error">{{ transfer_error }}</p>
     {% endif %}
     {% if transfer_message %}
     <p class="alert success">{{ transfer_message }}</p>
     {% endif %}
-    {% if transfer_players and transfer_teams %}
+    {% if transfer_teams and (transfer_players or transfer_judges) %}
     <form method="post" action="/admin/transfer-player" class="form-inline transfer-form">
-        <label for="transfer_player_id">Player:</label>
-        <select name="player_id" id="transfer_player_id" required>
-            <option value="" disabled selected>Select&nbsp;Player</option>
-            {% for player in transfer_players %}
-            <option value="{{ player.id }}" data-current-team="{{ player.team_id or '' }}">{{ player.first_name }}{% if player.team %} &mdash; {{ player.team.name }}{% endif %}</option>
-            {% endfor %}
+        <input type="hidden" name="transfer_action" value="move_to_team">
+        <label for="move_member_id">Member:</label>
+        <select name="member_id" id="move_member_id" required>
+            <option value="" disabled selected>Select&nbsp;Member</option>
+            {% if transfer_players %}
+            <optgroup label="Team&nbsp;Players">
+                {% for player in transfer_players %}
+                <option value="{{ player.id }}" data-current-team="{{ player.team_id or '' }}">{{ player.first_name }}{% if player.team %} &mdash; {{ player.team.name }}{% endif %}</option>
+                {% endfor %}
+            </optgroup>
+            {% endif %}
+            {% if transfer_judges %}
+            <optgroup label="Judges">
+                {% for judge in transfer_judges %}
+                <option value="{{ judge.id }}" data-current-team="">{{ judge.first_name }}</option>
+                {% endfor %}
+            </optgroup>
+            {% endif %}
         </select>
-        <span class="transfer-label">Transfer&nbsp;to</span>
-        <select name="target_team_id" id="transfer_team_id" required>
+        <span class="transfer-label">Assign&nbsp;to</span>
+        <select name="target_team_id" id="move_target_team_id" required>
             <option value="" disabled selected>Select&nbsp;Team</option>
             {% for team in transfer_teams %}
             <option value="{{ team.id }}" data-member-count="{{ team.member_count }}">{{ team.name }} ({{ team.member_count }} players)</option>
             {% endfor %}
         </select>
-        <button type="submit">Transfer</button>
+        <button type="submit">Assign</button>
     </form>
-    {% elif not transfer_players %}
-    <p class="empty-state">No players are currently assigned to teams.</p>
+    {% elif not transfer_players and not transfer_judges %}
+    <p class="empty-state">No players or judges are currently eligible for reassignment.</p>
     {% else %}
     <p class="empty-state">No teams have open slots under the 9-player limit.</p>
+    {% endif %}
+    <div class="transfer-divider"></div>
+    {% if transfer_players %}
+        {% if judge_slots_available > 0 %}
+        <form method="post" action="/admin/transfer-player" class="form-inline transfer-form promote-form">
+            <input type="hidden" name="transfer_action" value="promote_to_judge">
+            <label for="promote_member_id">Team&nbsp;Member:</label>
+            <select name="member_id" id="promote_member_id" required>
+                <option value="" disabled selected>Select&nbsp;Member</option>
+                {% for player in transfer_players %}
+                <option value="{{ player.id }}">{{ player.first_name }}{% if player.team %} &mdash; {{ player.team.name }}{% endif %}</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Promote&nbsp;to&nbsp;Judge</button>
+        </form>
+        <p class="transfer-note">{{ max_judges - judge_slots_available }} of {{ max_judges }} judge roles currently filled.</p>
+        {% else %}
+        <p class="empty-state">Judge roles are full ({{ max_judges }} of {{ max_judges }} assigned).</p>
+        {% endif %}
+    {% else %}
+    <p class="empty-state">No team members are available for judge promotion.</p>
     {% endif %}
 </section>
 
@@ -105,13 +138,13 @@
     <p class="empty-state">All members have selected a team.</p>
     {% endif %}
 </section>
-{% if transfer_players and transfer_teams %}
+{% if transfer_teams and (transfer_players or transfer_judges) %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const playerSelect = document.getElementById('transfer_player_id');
-    const teamSelect = document.getElementById('transfer_team_id');
+    const memberSelect = document.getElementById('move_member_id');
+    const teamSelect = document.getElementById('move_target_team_id');
     function filterTeams() {
-        const currentTeamId = playerSelect.selectedOptions.length ? playerSelect.selectedOptions[0].dataset.currentTeam : '';
+        const currentTeamId = memberSelect.selectedOptions.length ? memberSelect.selectedOptions[0].dataset.currentTeam : '';
         Array.from(teamSelect.options).forEach((option) => {
             if (!option.value) {
                 option.hidden = false;
@@ -130,8 +163,8 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         });
     }
-    if (playerSelect && teamSelect) {
-        playerSelect.addEventListener('change', filterTeams);
+    if (memberSelect && teamSelect) {
+        memberSelect.addEventListener('change', filterTeams);
         filterTeams();
     }
 });
