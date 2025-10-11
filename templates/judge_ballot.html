@@ -2,7 +2,7 @@
 
 {% block content %}
 <h2>Judging&nbsp;Team&nbsp;{{ team.name }}</h2>
-{% if game_state == 'live' and quests %}
+{% if game_state in ['live', 'closed'] and quests %}
     <table>
         <thead>
             <tr>

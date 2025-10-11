@@ -610,6 +610,7 @@ def player_quests_get(request: Request, db: Session = Depends(database.get_db), 
             "team_name": team.name,
             "quests": quests_data,
             "game_state": session.state,
+            "uploads_locked": session.state != "live",
         },
     )
 
@@ -622,6 +623,9 @@ def player_upload(
     db: Session = Depends(database.get_db),
     user: User = Depends(require_role("player")),
 ) -> RedirectResponse:
+    session = get_session(db)
+    if session.state != "live":
+        raise HTTPException(status.HTTP_403_FORBIDDEN, detail="Uploads are closed for this session")
     # Ensure the user belongs to the team quest
     tq = db.query(TeamQuest).filter(TeamQuest.id == team_quest_id).first()
     if not tq or tq.team_id != user.team_id:
