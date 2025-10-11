@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block content %}
+<h2>Change Team Name</h2>
+<p>Your current team name is <strong>{{ team.name }}</strong>.</p>
+{% if error %}
+<p class="form-error">{{ error }}</p>
+{% endif %}
+<form method="post" action="/player/team-name">
+    <label for="new_team_name">New Team Name</label>
+    <input
+        type="text"
+        id="new_team_name"
+        name="new_team_name"
+        value="{{ submitted_name if submitted_name is not none else team.name }}"
+        required
+        minlength="3"
+    />
+    <button type="submit">Save</button>
+</form>
+<p><a href="/player/home">Cancel</a></p>
+{% endblock %}

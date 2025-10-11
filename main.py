@@ -579,6 +579,82 @@ def player_home(
     )
 
 
+@app.get("/player/team-name", response_class=HTMLResponse)
+def player_team_name_get(
+    request: Request,
+    db: Session = Depends(database.get_db),
+    user: User = Depends(require_role("player")),
+) -> HTMLResponse:
+    if not user.team_id:
+        return RedirectResponse(url="/player/teams", status_code=302)
+
+    team = db.query(Team).filter(Team.id == user.team_id).first()
+    if not team:
+        user.team_id = None
+        user.is_team_leader = False
+        db.commit()
+        return RedirectResponse(url="/player/teams", status_code=302)
+
+    return templates.TemplateResponse(
+        "player_change_team_name.html",
+        {
+            "request": request,
+            "team": team,
+            "error": None,
+            "submitted_name": None,
+        },
+    )
+
+
+@app.post("/player/team-name", response_class=HTMLResponse)
+def player_team_name_post(
+    request: Request,
+    new_team_name: str = Form(...),
+    db: Session = Depends(database.get_db),
+    user: User = Depends(require_role("player")),
+) -> Response:
+    if not user.team_id:
+        return RedirectResponse(url="/player/teams", status_code=302)
+
+    team = db.query(Team).filter(Team.id == user.team_id).first()
+    if not team:
+        user.team_id = None
+        user.is_team_leader = False
+        db.commit()
+        return RedirectResponse(url="/player/teams", status_code=302)
+
+    new_team_name = (new_team_name or "").strip()
+
+    error: Optional[str] = None
+    if len(new_team_name) < 3:
+        error = "Team name must be at least 3 characters."
+    else:
+        existing_team = (
+            db.query(Team)
+            .filter(Team.name == new_team_name, Team.id != team.id)
+            .first()
+        )
+        if existing_team:
+            error = "That team name is already in use. Please choose another name."
+
+    if error:
+        return templates.TemplateResponse(
+            "player_change_team_name.html",
+            {
+                "request": request,
+                "team": team,
+                "error": error,
+                "submitted_name": new_team_name,
+            },
+            status_code=400,
+        )
+
+    team.name = new_team_name
+    db.commit()
+
+    return RedirectResponse(url="/player/home", status_code=303)
+
+
 @app.get("/player/quests", response_class=HTMLResponse)
 def player_quests_get(request: Request, db: Session = Depends(database.get_db), user: User = Depends(require_role("player"))) -> HTMLResponse:
     if not user.team_id:

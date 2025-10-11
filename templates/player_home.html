@@ -2,6 +2,9 @@
 
 {% block content %}
 <h2>Team&nbsp;{{ team.name }}</h2>
+<form method="get" action="/player/team-name">
+    <button type="submit">Change Team Name</button>
+</form>
 <div class="video-embed">
     <iframe
         src="https://www.youtube.com/embed/RlJawHL0d5Q"
