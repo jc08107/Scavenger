@@ -468,7 +468,7 @@ def player_teams_get(request: Request, db: Session = Depends(database.get_db), u
     if user.team_id:
         return RedirectResponse(url="/player/home", status_code=302)
     # Retrieve existing teams
-    teams = db.query(Team).all()
+    teams = db.query(Team).order_by(Team.name.asc()).all()
     message = request.query_params.get("message")
     return templates.TemplateResponse(
         "player_teams.html",
@@ -478,6 +478,27 @@ def player_teams_get(request: Request, db: Session = Depends(database.get_db), u
             "message": message,
         },
     )
+
+
+@app.get("/player/teams/{team_id}/roster")
+def player_team_roster(
+    team_id: int,
+    db: Session = Depends(database.get_db),
+    user: User = Depends(require_role("player")),
+) -> dict:
+    team = (
+        db.query(Team)
+        .options(subqueryload(Team.members))
+        .filter(Team.id == team_id)
+        .first()
+    )
+    if not team:
+        raise HTTPException(status_code=404, detail="Team not found")
+    roster = [
+        {"id": member.id, "first_name": member.first_name}
+        for member in sorted(team.members, key=lambda member: (member.first_name or "").lower())
+    ]
+    return {"team": {"id": team.id, "name": team.name, "members": roster}}
 
 
 @app.post("/player/teams")
@@ -493,7 +514,7 @@ def player_teams_post(
     session = get_session(db)
 
     def render_with_message(message: str, status_code: int = 200) -> HTMLResponse:
-        teams = db.query(Team).all()
+        teams = db.query(Team).order_by(Team.name.asc()).all()
         return templates.TemplateResponse(
             "player_teams.html",
             {

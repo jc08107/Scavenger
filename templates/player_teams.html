@@ -19,6 +19,11 @@
     </select>
     <button type="submit">Join&nbsp;Team</button>
 </form>
+<div id="team-roster" class="team-roster" aria-live="polite">
+    <h4>Team&nbsp;Roster&nbsp;Preview</h4>
+    <p data-roster-message>Select a team to view current members.</p>
+    <ul class="roster-list" hidden></ul>
+</div>
 {% else %}
 <p>No teams have been created yet.</p>
 {% endif %}
@@ -26,8 +31,78 @@
 <h3>Create&nbsp;a&nbsp;New&nbsp;Team</h3>
 <form method="post">
     <input type="hidden" name="team_id" value="">
-    <label for="new_team_name">Team&nbsp;Name</label>
-    <input type="text" id="new_team_name" name="new_team_name" required>
-    <button type="submit">Create&nbsp;Team</button>
+<label for="new_team_name">Team&nbsp;Name</label>
+<input type="text" id="new_team_name" name="new_team_name" required>
+<button type="submit">Create&nbsp;Team</button>
 </form>
+
+{% if teams %}
+<script>
+(function () {
+    const selectEl = document.querySelector('select[name="team_id"]');
+    const rosterEl = document.getElementById('team-roster');
+    if (!selectEl || !rosterEl) {
+        return;
+    }
+    const messageEl = rosterEl.querySelector('[data-roster-message]');
+    const listEl = rosterEl.querySelector('.roster-list');
+
+    const showMessage = function (text) {
+        if (messageEl) {
+            messageEl.textContent = text;
+            messageEl.hidden = false;
+        }
+        if (listEl) {
+            listEl.hidden = true;
+            listEl.innerHTML = '';
+        }
+    };
+
+    const renderRoster = function (members) {
+        if (!Array.isArray(members) || members.length === 0) {
+            showMessage('No teammates have joined this team yet.');
+            return;
+        }
+        if (!listEl) {
+            return;
+        }
+        if (messageEl) {
+            messageEl.hidden = true;
+        }
+        listEl.innerHTML = '';
+        members.forEach(function (member) {
+            const li = document.createElement('li');
+            li.textContent = member.first_name || 'Unnamed player';
+            listEl.appendChild(li);
+        });
+        listEl.hidden = false;
+    };
+
+    const handleSelectionChange = async function () {
+        const teamId = selectEl.value;
+        if (!teamId) {
+            showMessage('Select a team to view current members.');
+            return;
+        }
+        showMessage('Loading roster...');
+        try {
+            const response = await fetch('/player/teams/' + encodeURIComponent(teamId) + '/roster', {
+                headers: { Accept: 'application/json' }
+            });
+            if (!response.ok) {
+                throw new Error('Request failed');
+            }
+            const data = await response.json();
+            const members = data && data.team && Array.isArray(data.team.members) ? data.team.members : [];
+            renderRoster(members);
+        } catch (error) {
+            console.error('Unable to load team roster', error);
+            showMessage('Unable to load the roster right now. Please try again.');
+        }
+    };
+
+    selectEl.addEventListener('change', handleSelectionChange);
+})();
+</script>
+{% endif %}
 {% endblock %}
