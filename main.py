@@ -249,8 +249,18 @@ def reset_session_quests(db: Session, session: GameSession) -> None:
     return
 
 
-def reset_all_teams(db: Session) -> None:
-    """Remove all teams, clear member associations, and free up judge slots."""
+def sync_invitation_code_usage(db: Session) -> None:
+    """Recalculate invitation-code usage from the current user table."""
+    codes = db.query(InvitationCode).all()
+    for code in codes:
+        active_users = db.query(User).filter(User.invitation_code_id == code.id).count()
+        code.used_count = active_users
+        if code.max_uses is not None:
+            code.active = active_users < code.max_uses
+
+
+def reset_all_teams(db: Session, admin_user_id: int) -> None:
+    """Delete all non-admin accounts, remove teams, and clear team progress."""
     teams = db.query(Team).all()
     team_ids = [team.id for team in teams]
     team_quest_ids: List[int] = []
@@ -275,19 +285,11 @@ def reset_all_teams(db: Session) -> None:
         db.query(Score).filter(Score.team_quest_id.in_(team_quest_ids)).delete(synchronize_session=False)
         db.query(TeamQuest).filter(TeamQuest.id.in_(team_quest_ids)).delete(synchronize_session=False)
 
-    db.query(User).filter(User.team_id.isnot(None)).update(
-        {User.team_id: None, User.is_team_leader: False},
-        synchronize_session=False,
-    )
-    db.query(User).filter(
-        User.role.isnot(None),
-        User.role != "admin",
-    ).update(
-        {User.role: None},
-        synchronize_session=False,
-    )
     if team_ids:
         db.query(Team).filter(Team.id.in_(team_ids)).delete(synchronize_session=False)
+
+    db.query(User).filter(User.id != admin_user_id).delete(synchronize_session=False)
+    sync_invitation_code_usage(db)
 
     return
 
@@ -996,7 +998,7 @@ def admin_dashboard(
         team_groups.append({"team": team, "members": members})
     awaiting_members = (
         db.query(User)
-        .filter(User.team_id.is_(None))
+        .filter(User.team_id.is_(None), User.id != user.id)
         .order_by(User.first_name.asc())
         .all()
     )
@@ -1119,7 +1121,7 @@ def admin_team_reset(
     db: Session = Depends(database.get_db),
     user: User = Depends(require_role("admin")),
 ) -> RedirectResponse:
-    reset_all_teams(db)
+    reset_all_teams(db, admin_user_id=user.id)
     db.commit()
     return RedirectResponse(url="/admin/dashboard", status_code=302)
 

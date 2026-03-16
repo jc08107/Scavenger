@@ -24,7 +24,7 @@
 {% if quest_count == 0 %}
 <p class="empty-state">No quest CSV is currently loaded.</p>
 {% endif %}
-<form method="post" action="/admin/team-reset" class="form-inline" onsubmit="return confirm('This will delete all teams and remove members from their teams. Continue?');">
+<form method="post" action="/admin/team-reset" class="form-inline" onsubmit="return confirm('This will delete every non-admin account and remove all teams, assignments, and progress. Continue?');">
     <button type="submit">Team&nbsp;Reset</button>
 </form>
 <section class="transfer-section">

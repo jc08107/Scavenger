@@ -81,9 +81,6 @@
   .card h3 { margin-top: 0; color: #e7fbff; letter-spacing: .02em; }
   .muted { color: var(--muted); }
 
-  .video-embed { position: relative; width: 100%; aspect-ratio: 16/9; }
-  .video-embed iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; border-radius: 12px; }
-
   table { width: 100%; border-collapse: collapse; font-size: 1rem; }
   thead th { text-align: left; padding: .6rem .7rem; color: #dff7ff; border-bottom: 1px solid var(--card-border); background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.02)); }
   tbody td { padding: .6rem .7rem; border-bottom: 1px dashed rgba(255,255,255,.15); }
@@ -113,10 +110,7 @@
 
   <div class="grid">
     <div class="card col-8">
-      <div class="video-embed">
-        <iframe src="https://www.youtube.com/embed/RlJawHL0d5Q" title="Scavenger Hunt overview video" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
-      </div>
-      <p class="muted" style="margin-top:.6rem;">You are a member of <strong>{{ team.name }}</strong>. Check in here to see who else is on your team.</p>
+      <p class="muted">You are a member of <strong>{{ team.name }}</strong>. Check in here to see who else is on your team.</p>
       <div class="cta-row">
         <a href="/player/quests" class="button">View Team Quests</a>
       </div>
